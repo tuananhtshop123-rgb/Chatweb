@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>Chào mừng đến với Game của tôi!</h1>
+    <!-- Nạp thư viện socket.io phía client -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io(); // Kết nối tới server
+        socket.on('connect', () => {
+            console.log('Đã kết nối với server:', socket.id);
+        });
+    </script>
+</body>
+</html>
