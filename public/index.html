@@ -10,11 +10,11 @@
         .box { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; }
         .color-btn { width: 30px; height: 30px; border-radius: 5px; border: none; cursor: pointer; margin: 5px; }
         #game-layer { display: none; }
-        /* Chat UI */
         #chat-ui { position: absolute; bottom: 20px; left: 20px; width: 250px; }
         #chat-log { height: 120px; background: rgba(0,0,0,0.4); color: white; padding: 5px; border-radius: 5px; overflow-y: auto; font-size: 14px; margin-bottom: 5px;}
-        #chat-input { width: 100%; padding: 5px; display: none; }
-        #joystick { position: absolute; bottom: 50px; right: 50px; width: 100px; height: 100px; background: rgba(0,0,0,0.1); border-radius: 50%; display: none; }
+        #chat-input { width: 100%; padding: 8px; display: none; border-radius: 5px; }
+        /* Nút Chat cho Mobile */
+        #chat-btn { position: absolute; bottom: 20px; right: 20px; padding: 15px; background: #333; color: white; border-radius: 50%; border: none; display: none; z-index: 100; }
     </style>
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -33,9 +33,9 @@
     <canvas id="canvas"></canvas>
     <div id="chat-ui">
         <div id="chat-log"></div>
-        <input id="chat-input" placeholder="Gõ '/' để chat...">
+        <input id="chat-input" placeholder="Gõ chat...">
     </div>
-    <div id="joystick"><div id="knob" style="position:absolute; width:40px; height:40px; background:gray; border-radius:50%; top:30px; left:30px;"></div></div>
+    <button id="chat-btn" onclick="toggleChat()">💬</button>
 </div>
 
 <script>
@@ -45,12 +45,13 @@
     const colors = ['#FF5733', '#33FF57', '#3357FF', '#F333FF', '#FF33A8', '#33FFF5', '#F5FF33'];
     let myColor = colors[0];
     let players = {};
-    let isTyping = false; // Flag để dừng nhân vật khi đang gõ
-    
-    // Tạo cỏ hoa ngẫu nhiên 1 lần duy nhất
+    let isTyping = false; 
+
+    // Cấu hình di chuyển cục bộ để chống giật
+    let myLocalPos = { x: 400, y: 300 };
+
     const deco = Array.from({length: 60}, () => ({x: Math.random()*2000, y: Math.random()*2000, type: Math.random()>0.2?'grass':'flower'}));
 
-    // Setup UI
     colors.forEach(c => {
         let b = document.createElement('button');
         b.className = 'color-btn'; b.style.backgroundColor = c;
@@ -63,55 +64,68 @@
         socket.emit('join', { name, color: myColor });
         document.getElementById('lobby').style.display = 'none';
         document.getElementById('game-layer').style.display = 'block';
-        if('ontouchstart' in window) document.getElementById('joystick').style.display = 'block';
+        if('ontouchstart' in window) document.getElementById('chat-btn').style.display = 'block';
     }
 
-    // Input & Chat
+    function toggleChat() {
+        const input = document.getElementById('chat-input');
+        input.style.display = (input.style.display === 'block') ? 'none' : 'block';
+        if(input.style.display === 'block') { input.focus(); isTyping = true; }
+        else { isTyping = false; }
+    }
+
     const keys = {};
     window.onkeydown = e => {
-        if(e.key === '/') { e.preventDefault(); document.getElementById('chat-input').style.display='block'; document.getElementById('chat-input').focus(); isTyping=true; }
         if(e.key === 'Enter') { 
-            socket.emit('chat', document.getElementById('chat-input').value); 
-            document.getElementById('chat-input').value=''; document.getElementById('chat-input').style.display='none'; isTyping=false; 
+            if(isTyping) { socket.emit('chat', document.getElementById('chat-input').value); document.getElementById('chat-input').value=''; toggleChat(); }
+            else { toggleChat(); }
         }
         keys[e.key] = true;
     };
     window.onkeyup = e => keys[e.key] = false;
 
-    socket.on('update', data => players = data);
+    socket.on('update', data => {
+        // Cập nhật tất cả người chơi khác từ server
+        players = data;
+        // Chỉ cập nhật vị trí của CHÍNH MÌNH từ server nếu cần đồng bộ sau một khoảng thời gian (nhưng ở đây ta tin tưởng local)
+    });
+
     socket.on('newChat', c => { document.getElementById('chat-log').innerHTML += `<div><b>${c.name}:</b> ${c.msg}</div>`; });
 
     function draw() {
         ctx.clearRect(0,0, canvas.width, canvas.height);
-        // Vẽ cỏ hoa
         deco.forEach(d => { ctx.fillStyle = d.type==='grass'?'#228B22':'#FF69B4'; ctx.fillRect(d.x, d.y, 6, 12); });
+
+        // Di chuyển Local (Không đợi server để mượt mà)
+        if(!isTyping) {
+            if(keys['w']) myLocalPos.y -= 5;
+            if(keys['s']) myLocalPos.y += 5;
+            if(keys['a']) myLocalPos.x -= 5;
+            if(keys['d']) myLocalPos.x += 5;
+            // Gửi vị trí lên server
+            socket.emit('move', myLocalPos);
+        }
 
         for(let id in players) {
             let p = players[id];
+            // Vẽ chính mình dùng myLocalPos thay vì p.x/p.y từ server để không bị giật
+            let renderX = (id === socket.id) ? myLocalPos.x : p.x;
+            let renderY = (id === socket.id) ? myLocalPos.y : p.y;
+
             ctx.save();
-            ctx.strokeStyle = "black"; ctx.lineWidth = 2; // Viền đen
+            ctx.strokeStyle = "black"; ctx.lineWidth = 2;
             ctx.fillStyle = p.color;
-            ctx.fillRect(p.x, p.y, 30, 50); // Cao 50, thon 30
-            ctx.strokeRect(p.x, p.y, 30, 50);
+            ctx.fillRect(renderX, renderY, 30, 50);
+            ctx.strokeRect(renderX, renderY, 30, 50);
             
             ctx.fillStyle = "black";
-            ctx.fillText(p.name, p.x, p.y - 10);
+            ctx.fillText(p.name, renderX, renderY - 10);
 
-            // Khung chat trắng
             if(p.chat) {
-                ctx.fillStyle = "white"; ctx.fillRect(p.x-5, p.y-40, 60, 20);
-                ctx.fillStyle = "black"; ctx.fillText(p.chat, p.x, p.y - 25);
+                ctx.fillStyle = "white"; ctx.fillRect(renderX-5, renderY-40, 60, 20);
+                ctx.fillStyle = "black"; ctx.fillText(p.chat, renderX, renderY - 25);
             }
             ctx.restore();
-        }
-        
-        // Di chuyển (chỉ di chuyển khi không gõ chat)
-        if(!isTyping && players[socket.id]) {
-            if(keys['w']) players[socket.id].y -= 5;
-            if(keys['s']) players[socket.id].y += 5;
-            if(keys['a']) players[socket.id].x -= 5;
-            if(keys['d']) players[socket.id].x += 5;
-            socket.emit('move', {x: players[socket.id].x, y: players[socket.id].y});
         }
         requestAnimationFrame(draw);
     }
