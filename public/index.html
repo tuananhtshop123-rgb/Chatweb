@@ -1,86 +1,123 @@
 <!DOCTYPE html>
-<html>
-<head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<style>
-    body { margin:0; background:#90EE90; font-family: sans-serif; overflow:hidden; }
-    #ui { position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; background:rgba(255,255,255,0.8); display:flex; justify-content:center; align-items:center; }
-    #chat-box { position:absolute; bottom:20px; left:20px; width:250px; }
-    #chat-log { height:120px; background:rgba(0,0,0,0.4); color:white; overflow-y:auto; padding:5px; margin-bottom:5px; border-radius:5px; }
-    #msg-input { width:100%; display:none; }
-    #joy { position:absolute; bottom:30px; right:30px; width:100px; height:100px; background:rgba(0,0,0,0.1); border-radius:50%; display:none; }
-</style></head>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Game Online Vui Vẻ</title>
+    <style>
+        body { margin: 0; background: #90EE90; font-family: 'Arial', sans-serif; overflow: hidden; }
+        #lobby { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #E0F7FA; display: flex; justify-content: center; align-items: center; z-index: 10; }
+        .box { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; }
+        .color-btn { width: 30px; height: 30px; border-radius: 5px; border: none; cursor: pointer; margin: 5px; }
+        #game-layer { display: none; }
+        /* Chat UI */
+        #chat-ui { position: absolute; bottom: 20px; left: 20px; width: 250px; }
+        #chat-log { height: 120px; background: rgba(0,0,0,0.4); color: white; padding: 5px; border-radius: 5px; overflow-y: auto; font-size: 14px; margin-bottom: 5px;}
+        #chat-input { width: 100%; padding: 5px; display: none; }
+        #joystick { position: absolute; bottom: 50px; right: 50px; width: 100px; height: 100px; background: rgba(0,0,0,0.1); border-radius: 50%; display: none; }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
 <body>
-<div id="ui">
-    <div style="text-align:center;">
-        <h1>GAME ONLINE</h1>
-        <input id="nameInput" placeholder="Tên nhân vật..."> <br>
-        <div id="colors"></div> <br>
-        <button onclick="create()">Tạo Phòng</button> <input id="roomInput" placeholder="Mã phòng..."> <button onclick="join()">Vào</button>
+
+<div id="lobby">
+    <div class="box">
+        <h1>Vào Game</h1>
+        <input id="nameInput" placeholder="Tên của bạn...">
+        <div id="colors"></div>
+        <button onclick="play()" style="padding: 10px 30px; font-size: 18px; cursor: pointer;">PLAY</button>
     </div>
 </div>
-<div id="chat-box">
-    <div id="chat-log"></div>
-    <input id="msg-input" placeholder="Nhấn / để chat...">
+
+<div id="game-layer">
+    <canvas id="canvas"></canvas>
+    <div id="chat-ui">
+        <div id="chat-log"></div>
+        <input id="chat-input" placeholder="Gõ '/' để chat...">
+    </div>
+    <div id="joystick"><div id="knob" style="position:absolute; width:40px; height:40px; background:gray; border-radius:50%; top:30px; left:30px;"></div></div>
 </div>
-<div id="joy"></div>
-<canvas id="canvas"></canvas>
 
-<script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let players = {}, my = {x:400, y:300, color:'red', name:''};
-const keys = {};
-
-// Cỏ và hoa
-const deco = Array.from({length:50},()=>({x:Math.random()*3000, y:Math.random()*3000, type:Math.random()>0.5?'grass':'flower'}));
-
-window.onkeydown = e => {
-    if(e.key === '/') { document.getElementById('msg-input').style.display='block'; document.getElementById('msg-input').focus(); }
-    if(e.key === 'Enter') { socket.emit('chat', document.getElementById('msg-input').value); document.getElementById('msg-input').value=''; document.getElementById('msg-input').style.display='none'; }
-    keys[e.key] = true;
-};
-window.onkeyup = e => keys[e.key] = false;
-
-// Đồ họa nhân vật cao thon, viền đen
-function drawPlayer(p) {
-    ctx.strokeStyle = "black"; ctx.lineWidth = 3;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y, 30, 50); // Nhân vật cao (50) thon (30)
-    ctx.strokeRect(p.x, p.y, 30, 50);
-    ctx.fillStyle = "black"; ctx.fillText(p.name, p.x, p.y-10);
-    if(p.chat) { ctx.fillStyle="white"; ctx.fillRect(p.x, p.y-40, 50, 20); ctx.fillStyle="black"; ctx.fillText(p.chat, p.x+5, p.y-25); }
-}
-
-function loop() {
-    ctx.clearRect(0,0,3000,3000);
-    deco.forEach(d => { ctx.fillStyle = d.type==='grass'?'green':'pink'; ctx.fillRect(d.x, d.y, 5, 10); });
-    for(let id in players) drawPlayer(players[id]);
+    const socket = io();
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const colors = ['#FF5733', '#33FF57', '#3357FF', '#F333FF', '#FF33A8', '#33FFF5', '#F5FF33'];
+    let myColor = colors[0];
+    let players = {};
+    let isTyping = false; // Flag để dừng nhân vật khi đang gõ
     
-    // Prediction (Di chuyển mượt, không rung)
-    if(players[socket.id]) {
-        if(keys['w']) players[socket.id].y -= 5;
-        if(keys['s']) players[socket.id].y += 5;
-        if(keys['a']) players[socket.id].x -= 5;
-        if(keys['d']) players[socket.id].x += 5;
-        socket.emit('move', {x: players[socket.id].x, y: players[socket.id].y});
+    // Tạo cỏ hoa ngẫu nhiên 1 lần duy nhất
+    const deco = Array.from({length: 60}, () => ({x: Math.random()*2000, y: Math.random()*2000, type: Math.random()>0.2?'grass':'flower'}));
+
+    // Setup UI
+    colors.forEach(c => {
+        let b = document.createElement('button');
+        b.className = 'color-btn'; b.style.backgroundColor = c;
+        b.onclick = () => myColor = c;
+        document.getElementById('colors').appendChild(b);
+    });
+
+    function play() {
+        const name = document.getElementById('nameInput').value || "Người lạ";
+        socket.emit('join', { name, color: myColor });
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-layer').style.display = 'block';
+        if('ontouchstart' in window) document.getElementById('joystick').style.display = 'block';
     }
-    requestAnimationFrame(loop);
-}
 
-function create() { 
-    my.name = document.getElementById('nameInput').value;
-    socket.emit('join', my); socket.emit('createRoom'); 
-    document.getElementById('ui').style.display='none';
-    if('ontouchstart' in window) document.getElementById('joy').style.display='block';
-}
-function join() { socket.emit('joinRoom', document.getElementById('roomInput').value); document.getElementById('ui').style.display='none'; }
+    // Input & Chat
+    const keys = {};
+    window.onkeydown = e => {
+        if(e.key === '/') { e.preventDefault(); document.getElementById('chat-input').style.display='block'; document.getElementById('chat-input').focus(); isTyping=true; }
+        if(e.key === 'Enter') { 
+            socket.emit('chat', document.getElementById('chat-input').value); 
+            document.getElementById('chat-input').value=''; document.getElementById('chat-input').style.display='none'; isTyping=false; 
+        }
+        keys[e.key] = true;
+    };
+    window.onkeyup = e => keys[e.key] = false;
 
-socket.on('update', p => players = p);
-socket.on('newChat', c => { document.getElementById('chat-log').innerHTML += `<div>${c.name}: ${c.msg}</div>`; });
-window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-window.onresize(); loop();
+    socket.on('update', data => players = data);
+    socket.on('newChat', c => { document.getElementById('chat-log').innerHTML += `<div><b>${c.name}:</b> ${c.msg}</div>`; });
+
+    function draw() {
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+        // Vẽ cỏ hoa
+        deco.forEach(d => { ctx.fillStyle = d.type==='grass'?'#228B22':'#FF69B4'; ctx.fillRect(d.x, d.y, 6, 12); });
+
+        for(let id in players) {
+            let p = players[id];
+            ctx.save();
+            ctx.strokeStyle = "black"; ctx.lineWidth = 2; // Viền đen
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 30, 50); // Cao 50, thon 30
+            ctx.strokeRect(p.x, p.y, 30, 50);
+            
+            ctx.fillStyle = "black";
+            ctx.fillText(p.name, p.x, p.y - 10);
+
+            // Khung chat trắng
+            if(p.chat) {
+                ctx.fillStyle = "white"; ctx.fillRect(p.x-5, p.y-40, 60, 20);
+                ctx.fillStyle = "black"; ctx.fillText(p.chat, p.x, p.y - 25);
+            }
+            ctx.restore();
+        }
+        
+        // Di chuyển (chỉ di chuyển khi không gõ chat)
+        if(!isTyping && players[socket.id]) {
+            if(keys['w']) players[socket.id].y -= 5;
+            if(keys['s']) players[socket.id].y += 5;
+            if(keys['a']) players[socket.id].x -= 5;
+            if(keys['d']) players[socket.id].x += 5;
+            socket.emit('move', {x: players[socket.id].x, y: players[socket.id].y});
+        }
+        requestAnimationFrame(draw);
+    }
+    
+    window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    window.onresize(); draw();
 </script>
 </body>
 </html>
