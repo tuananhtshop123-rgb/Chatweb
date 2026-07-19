@@ -2,41 +2,111 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Game Online Của Bạn</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Game Online Vui Vẻ</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Arial', sans-serif; background: #87CEEB; }
-        #menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #f0f9ff; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
-        .controls-ui { margin-bottom: 20px; }
-        input { padding: 10px; font-size: 16px; margin-bottom: 10px; }
-        .color-btns { display: flex; gap: 5px; margin-bottom: 20px; }
-        .color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid #fff; }
-        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 5px; }
+        body { margin: 0; background: #FFF; font-family: 'Arial', sans-serif; overflow: hidden; }
+        #lobby { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #E0F7FA; display: flex; justify-content: center; align-items: center; z-index: 10; }
+        .box { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; }
+        .color-btn { width: 30px; height: 30px; border-radius: 5px; border: none; cursor: pointer; margin: 5px; }
         
-        #game-ui { display: none; }
-        canvas { display: block; background: #90EE90; }
+        #game-layer { display: none; }
+        #chat-bar { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; }
+        #chat-input { padding: 10px; width: 200px; border-radius: 20px; border: 1px solid #ccc; outline: none; }
         
-        #chat-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; }
-        #joystick { position: absolute; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.5); border-radius: 50%; display: none; }
+        #joystick { position: absolute; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(0,0,0,0.1); border-radius: 50%; display: none; }
     </style>
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
-    <div id="menu">
-        <h1>Chào mừng đến với Zone Game</h1>
-        <input type="text" id="username" placeholder="Nhập tên của bạn...">
-        <div class="color-btns" id="colorPicker"></div>
-        <button onclick="startGame()">PLAY</button>
-    </div>
-
-    <div id="game-ui">
-        <canvas id="gameCanvas"></canvas>
-        <div id="chat-bar">
-            <input type="text" id="chatInput" placeholder="Nhập nội dung chat..." onkeydown="handleChat(event)">
+<div id="lobby">
+    <div class="box">
+        <h1>Vào Game</h1>
+        <div style="margin-bottom: 20px;">
+            <input id="nameInput" placeholder="Tên của bạn...">
+            <div id="colors"></div>
         </div>
-        <div id="joystick"></div>
+        <button onclick="play()" style="padding: 10px 30px; font-size: 18px; cursor: pointer;">PLAY</button>
     </div>
+</div>
 
-    <script src="index.js"></script>
+<div id="game-layer">
+    <canvas id="canvas"></canvas>
+    <div id="chat-bar"><input id="chat-input" placeholder="Chat..."></div>
+    <div id="joystick"><div id="knob" style="position:absolute; width:40px; height:40px; background:gray; border-radius:50%; top:30px; left:30px;"></div></div>
+</div>
+
+<script>
+    const socket = io();
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const colors = ['#FF5733', '#33FF57', '#3357FF', '#F333FF', '#FF33A8', '#33FFF5', '#F5FF33'];
+    let myColor = colors[0];
+    let players = {};
+    let myId = "";
+
+    // Setup UI
+    colors.forEach(c => {
+        let b = document.createElement('button');
+        b.className = 'color-btn'; b.style.backgroundColor = c;
+        b.onclick = () => myColor = c;
+        document.getElementById('colors').appendChild(b);
+    });
+
+    function play() {
+        const name = document.getElementById('nameInput').value || "Người lạ";
+        socket.emit('join', { name, color: myColor });
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-layer').style.display = 'block';
+        if('ontouchstart' in window) document.getElementById('joystick').style.display = 'block';
+    }
+
+    // Input
+    const keys = {};
+    window.onkeydown = e => keys[e.key] = true;
+    window.onkeyup = e => keys[e.key] = false;
+
+    // Chat
+    document.getElementById('chat-input').onkeypress = e => {
+        if(e.key === 'Enter') {
+            socket.emit('chat', e.target.value);
+            e.target.value = '';
+        }
+    };
+
+    // Gameloop
+    socket.on('update', data => players = data);
+    
+    function draw() {
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = '#90EE90'; // Bãi cỏ xanh
+        ctx.fillRect(0,0, canvas.width, canvas.height);
+
+        for(let id in players) {
+            let p = players[id];
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 40, 40); // Nhân vật chữ nhật
+            ctx.fillStyle = "black";
+            ctx.fillText(p.name, p.x, p.y - 10);
+            if(p.chat) ctx.fillText(p.chat, p.x, p.y - 25);
+        }
+        
+        // Move
+        if(players[socket.id]) {
+            if(keys['w']) players[socket.id].y -= 5;
+            if(keys['s']) players[socket.id].y += 5;
+            if(keys['a']) players[socket.id].x -= 5;
+            if(keys['d']) players[socket.id].x += 5;
+            socket.emit('move', {x: players[socket.id].x, y: players[socket.id].y});
+        }
+        requestAnimationFrame(draw);
+    }
+    
+    // Xử lý resize
+    window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    window.onresize();
+    draw();
+</script>
 </body>
 </html>
