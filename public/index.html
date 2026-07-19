@@ -1,13 +1,176 @@
 <!DOCTYPE html>
-<html>
-<body>
-    <h1>Chào mừng đến với Game của tôi!</h1>
-    <!-- Nạp thư viện socket.io phía client -->
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zombie Survival Co-op 2D</title>
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
+        canvas { display: block; background: #1a231a; }
+        #scoreboard { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; pointer-events: none; }
+    </style>
     <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <div id="scoreboard">
+        <h3>Điểm số nhóm:</h3>
+        <div id="scores">Đang kết nối...</div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
     <script>
-        const socket = io(); // Kết nối tới server
-        socket.on('connect', () => {
-            console.log('Đã kết nối với server:', socket.id);
+        const socket = io();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let myId = null;
+        let localPlayer = { x: 0, y: 0, speed: 4 };
+        let players = {};
+        let bullets = [];
+        let zombies = [];
+
+        // Hệ thống phím bấm di chuyển
+        const keys = { w: false, a: false, s: false, d: false };
+        window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+
+        // Nhận dữ liệu thiết lập ban đầu
+        socket.on('init', (data) => {
+            myId = data.id;
+            players = data.players;
+            zombies = data.zombies;
+            if (players[myId]) {
+                localPlayer.x = players[myId].x;
+                localPlayer.y = players[myId].y;
+            }
+        });
+
+        socket.on('newPlayer', data => { players[data.id] = data.player; });
+        socket.on('playerDisconnected', id => { delete players[id]; });
+
+        // Nhận cập nhật liên tục từ server
+        socket.on('stateUpdate', data => {
+            bullets = data.bullets;
+            zombies = data.zombies;
+            // Cập nhật điểm và vị trí của các người chơi khác
+            for (let id in data.players) {
+                if (id !== myId && players[id]) {
+                    players[id].x = data.players[id].x;
+                    players[id].y = data.players[id].y;
+                }
+                if (players[id]) players[id].score = data.players[id].score;
+            }
+            updateScoreboard();
+        });
+
+        // Click chuột để bắn đạn
+        window.addEventListener('mousedown', e => {
+            if (!myId || !players[myId]) return;
+            
+            // Tính toán góc bắn dựa trên vị trí chuột và vị trí người chơi trên màn hình
+            const screenCenterX = canvas.width / 2;
+            const screenCenterY = canvas.height / 2;
+            const angle = Math.atan2(e.clientY - screenCenterY, e.clientX - screenCenterX);
+            
+            const bulletSpeed = 7;
+            socket.emit('shoot', {
+                x: localPlayer.x,
+                y: localPlayer.y,
+                vx: Math.cos(angle) * bulletSpeed,
+                vy: Math.sin(angle) * bulletSpeed
+            });
+        });
+
+        function updateScoreboard() {
+            let html = '';
+            for (let id in players) {
+                let name = id === myId ? "Bạn (Player)" : `Bạn Bè (${id.substring(0,4)})`;
+                html += `<div>${name}: ${players[id].score || 0} pts</div>`;
+            }
+            document.getElementById('scores').innerHTML = html;
+        }
+
+        // Vòng lặp vẽ đồ họa game (Chạy mượt 60fps trên máy khách)
+        function gameLoop() {
+            // 1. Máy khách tự xử lý di chuyển của mình (Client Prediction)
+            let moved = false;
+            if (keys.w) { localPlayer.y -= localPlayer.speed; moved = true; }
+            if (keys.s) { localPlayer.y += localPlayer.speed; moved = true; }
+            if (keys.a) { localPlayer.x -= localPlayer.speed; moved = true; }
+            if (keys.d) { localPlayer.x += localPlayer.speed; moved = true; }
+
+            // Giới hạn trong bản đồ 1600x1200
+            localPlayer.x = Math.max(20, Math.min(1580, localPlayer.x));
+            localPlayer.y = Math.max(20, Math.min(1180, localPlayer.y));
+
+            if (moved) {
+                socket.emit('playerMove', { x: localPlayer.x, y: localPlayer.y });
+            }
+
+            // 2. Vẽ màn hình (Camera tập trung vào nhân vật của mình)
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const cameraX = canvas.width / 2 - localPlayer.x;
+            const cameraY = canvas.height / 2 - localPlayer.y;
+
+            ctx.save();
+            ctx.translate(cameraX, cameraY);
+
+            // Vẽ biên giới bản đồ
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(0, 0, 1600, 1200);
+
+            // Vẽ các người chơi khác
+            for (let id in players) {
+                if (id === myId) continue;
+                ctx.fillStyle = players[id].color;
+                ctx.beginPath();
+                ctx.arc(players[id].x, players[id].y, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Vẽ nhân vật của mình
+            if (players[myId]) {
+                ctx.fillStyle = players[myId].color;
+                ctx.beginPath();
+                ctx.arc(localPlayer.x, localPlayer.y, 20, 0, Math.PI * 2);
+                ctx.fill();
+                // Vẽ vòng bảo vệ tâm bắn nhỏ
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Vẽ Zombie (Màu đỏ)
+            zombies.forEach(z => {
+                ctx.fillStyle = '#ff4444';
+                ctx.beginPath();
+                ctx.arc(z.x, z.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Vẽ Đạn (Màu vàng)
+            bullets.forEach(b => {
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.restore();
+            requestAnimationFrame(gameLoop);
+        }
+
+        requestAnimationFrame(gameLoop);
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         });
     </script>
 </body>
