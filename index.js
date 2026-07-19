@@ -8,124 +8,179 @@ const path = require('path');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-let players = {};
-let bullets = [];
-let zombies = [];
-let nextZombieId = 0;
+// Quản lý dữ liệu toàn cục
+let usedNames = new Set();
+let rooms = {};
 
-// Khởi tạo một số zombie ban đầu
-for (let i = 0; i < 15; i++) {
-    zombies.push({
-        id: nextZombieId++,
-        x: Math.random() * 1600,
-        y: Math.random() * 1200,
-        hp: 2
-    });
+// Hàm tạo mã phòng 5 chữ số ngẫu nhiên
+function generateRoomCode() {
+    let code;
+    do {
+        code = Math.floor(10000 + Math.random() * 90000).toString();
+    } while (rooms[code]);
+    return code;
 }
 
 io.on('connection', (socket) => {
-    console.log('Người chơi kết nối:', socket.id);
-    
-    // Tạo người chơi mới ở vị trí ngẫu nhiên
-    players[socket.id] = {
-        x: 400 + Math.random() * 100,
-        y: 300 + Math.random() * 100,
-        color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-        score: 0
-    };
-
-    // Gửi dữ liệu ban đầu cho người mới vào
-    socket.emit('init', { id: socket.id, players, zombies });
-    // Báo cho người khác biết có người mới
-    socket.broadcast.emit('newPlayer', { id: socket.id, player: players[socket.id] });
-
-    // Cập nhật vị trí khi người chơi di chuyển
-    socket.on('playerMove', (data) => {
-        if (players[socket.id]) {
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
+    socket.on('registerName', (name) => {
+        if (usedNames.has(name)) {
+            socket.emit('nameError', 'Tên này đã có người dùng, vui lòng chọn tên khác!');
+        } else {
+            usedNames.add(name);
+            socket.playerName = name;
+            socket.emit('nameSuccess');
         }
     });
 
-    // Khi người chơi bắn đạn
-    socket.on('shoot', (bulletData) => {
-        bullets.push({
+    // Tạo phòng (Single hoặc Multi)
+    socket.on('createRoom', (data) => {
+        const roomCode = generateRoomCode();
+        rooms[roomCode] = {
+            host: socket.id,
+            maxPlayers: data.maxPlayers || 5,
+            players: {},
+            bullets: [],
+            zombies: [],
+            state: 'lobby'
+        };
+        joinRoomLogic(socket, roomCode);
+    });
+
+    // Vào phòng bằng mã
+    socket.on('joinRoom', (code) => {
+        if (!rooms[code]) {
+            return socket.emit('roomError', 'Phòng không tồn tại!');
+        }
+        if (Object.keys(rooms[code].players).length >= rooms[code].maxPlayers) {
+            return socket.emit('roomError', 'Phòng đã đầy!');
+        }
+        if (rooms[code].state === 'playing') {
+            return socket.emit('roomError', 'Phòng này đang trong trận đấu!');
+        }
+        joinRoomLogic(socket, code);
+    });
+
+    function joinRoomLogic(socket, code) {
+        socket.join(code);
+        socket.roomId = code;
+        rooms[code].players[socket.id] = {
+            id: socket.id,
+            name: socket.playerName,
+            x: 1500 + (Math.random() * 100 - 50), // Sinh ra quanh đống lửa ở giữa map (3000x3000)
+            y: 1500 + (Math.random() * 100 - 50),
+            money: 0,
+            color: `hsl(${Math.random() * 360}, 80%, 60%)`
+        };
+        io.to(code).emit('roomUpdate', { code: code, players: rooms[code].players, host: rooms[code].host });
+    }
+
+    // Chủ phòng bấm bắt đầu
+    socket.on('startGame', () => {
+        let room = rooms[socket.roomId];
+        if (room && room.host === socket.id) {
+            room.state = 'playing';
+            // Khởi tạo Zombie ở xa trung tâm
+            for (let i = 0; i < 30; i++) {
+                room.zombies.push(spawnZombie());
+            }
+            io.to(socket.roomId).emit('gameStarted', room.players);
+        }
+    });
+
+    function spawnZombie() {
+        return {
             id: Math.random(),
-            owner: socket.id,
-            x: bulletData.x,
-            y: bulletData.y,
-            vx: bulletData.vx,
-            vy: bulletData.vy,
-            life: 60 // số khung hình đạn tồn tại
-        });
+            x: Math.random() > 0.5 ? Math.random() * 500 : 2500 + Math.random() * 500,
+            y: Math.random() > 0.5 ? Math.random() * 500 : 2500 + Math.random() * 500,
+            hp: 3
+        };
+    }
+
+    socket.on('playerMove', (data) => {
+        let room = rooms[socket.roomId];
+        if (room && room.players[socket.id]) {
+            room.players[socket.id].x = data.x;
+            room.players[socket.id].y = data.y;
+        }
+    });
+
+    socket.on('shoot', (bulletData) => {
+        let room = rooms[socket.roomId];
+        if (room && room.state === 'playing') {
+            room.bullets.push({
+                id: Math.random(),
+                owner: socket.id,
+                x: bulletData.x,
+                y: bulletData.y,
+                vx: bulletData.vx,
+                vy: bulletData.vy,
+                angle: bulletData.angle,
+                life: 60
+            });
+        }
     });
 
     socket.on('disconnect', () => {
-        console.log('Người chơi ngắt kết nối:', socket.id);
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
+        if (socket.playerName) usedNames.delete(socket.playerName);
+        let room = rooms[socket.roomId];
+        if (room) {
+            delete room.players[socket.id];
+            io.to(socket.roomId).emit('roomUpdate', { code: socket.roomId, players: room.players, host: room.host });
+            // Xóa phòng nếu không còn ai
+            if (Object.keys(room.players).length === 0) {
+                delete rooms[socket.roomId];
+            }
+        }
     });
 });
 
-// Vòng lặp cập nhật Game trên Server (Gửi dữ liệu 30 lần/giây để tiết kiệm CPU)
+// Vòng lặp cập nhật Game cho TẤT CẢ các phòng đang chơi (30 FPS)
 setInterval(() => {
-    // 1. Cập nhật Đạn & Kiểm tra va chạm với Zombie
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        let b = bullets[i];
-        b.x += b.vx;
-        b.y += b.vy;
-        b.life--;
+    for (let code in rooms) {
+        let room = rooms[code];
+        if (room.state !== 'playing') continue;
 
-        let bulletRemoved = false;
-        // Check va chạm với từng zombie
-        for (let j = zombies.length - 1; j >= 0; j--) {
-            let z = zombies[j];
-            let dist = Math.hypot(b.x - z.x, b.y - z.y);
-            if (dist < 23) { // 8px đạn + 15px zombie
-                z.hp--;
-                bulletRemoved = true;
-                if (z.hp <= 0) {
-                    // Cộng điểm cho chủ nhân phát đạn
-                    if (players[b.owner]) players[b.owner].score += 10;
-                    // Hồi sinh zombie ở chỗ khác
-                    z.x = Math.random() * 1600;
-                    z.y = Math.random() * 1200;
-                    z.hp = 2;
+        // 1. Cập nhật Đạn & Va chạm
+        for (let i = room.bullets.length - 1; i >= 0; i--) {
+            let b = room.bullets[i];
+            b.x += b.vx;
+            b.y += b.vy;
+            b.life--;
+
+            let hit = false;
+            for (let j = room.zombies.length - 1; j >= 0; j--) {
+                let z = room.zombies[j];
+                if (Math.hypot(b.x - z.x, b.y - z.y) < 25) {
+                    z.hp--;
+                    hit = true;
+                    if (z.hp <= 0) {
+                        if (room.players[b.owner]) room.players[b.owner].money += 15; // Tiền rớt
+                        room.zombies.splice(j, 1);
+                        room.zombies.push(spawnZombie()); // Quái chết sinh con mới
+                    }
+                    break;
                 }
-                break;
             }
+            if (b.life <= 0 || hit) room.bullets.splice(i, 1);
         }
 
-        if (b.life <= 0 || bulletRemoved) {
-            bullets.splice(i, 1);
-        }
+        // 2. AI Zombie chạy theo người gần nhất
+        room.zombies.forEach(z => {
+            let closest = null, minDist = Infinity;
+            for (let id in room.players) {
+                let dist = Math.hypot(room.players[id].x - z.x, room.players[id].y - z.y);
+                if (dist < minDist) { minDist = dist; closest = room.players[id]; }
+            }
+            if (closest) {
+                let angle = Math.atan2(closest.y - z.y, closest.x - z.x);
+                z.x += Math.cos(angle) * 1.5;
+                z.y += Math.sin(angle) * 1.5;
+            }
+        });
+
+        // 3. Gửi dữ liệu về cho người chơi trong phòng đó
+        io.to(code).emit('stateUpdate', { players: room.players, bullets: room.bullets, zombies: room.zombies });
     }
-
-    // 2. Cập nhật AI Zombie di chuyển hướng về người chơi gần nhất
-    zombies.forEach(z => {
-        let closestPlayer = null;
-        let minDist = Infinity;
-        
-        for (let id in players) {
-            let p = players[id];
-            let dist = Math.hypot(p.x - z.x, p.y - z.y);
-            if (dist < minDist) {
-                minDist = dist;
-                closestPlayer = p;
-            }
-        }
-
-        if (closestPlayer) {
-            let angle = Math.atan2(closestPlayer.y - z.y, closestPlayer.x - z.x);
-            z.x += Math.cos(angle) * 1.2; // Tốc độ zombie
-            z.y += Math.sin(angle) * 1.2;
-        }
-    });
-
-    // 3. Phát dữ liệu đồng bộ cho tất cả các máy khách
-    io.emit('stateUpdate', { players, bullets, zombies });
 }, 1000 / 30);
 
-server.listen(3000, () => {
-    console.log('Server đang chạy tại: http://localhost:3000');
-});
+server.listen(3000, () => console.log('Server chạy cổng 3000'));
