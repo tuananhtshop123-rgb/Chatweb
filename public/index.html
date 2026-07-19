@@ -31,25 +31,30 @@
         #wave-announcement { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); font-size: 3rem; font-weight: bold; color: #ff5555; text-shadow: 0 0 20px red; display: none; z-index: 10; pointer-events: none; }
         
         /* Nút Auto Bắn */
-        #auto-shoot-btn { 
+       #auto-shoot-btn { 
     position: absolute; 
-    bottom: 20px; 
-    right: 20px; 
-    padding: 8px 16px; /* Thu nhỏ padding */
-    border-radius: 10px; /* Bo góc vừa phải */
-    font-size: 0.85rem; /* Chữ nhỏ vừa mắt */
+    bottom: 20px;      /* Cố định ở đáy màn hình */
+    right: 20px;       /* Cố định ở góc phải */
+    width: 90px;       /* Chiều rộng nhỏ gọn */
+    height: 40px;      /* Chiều cao vừa vặn */
+    padding: 0; 
+    border-radius: 8px; /* Bo góc vừa phải */
+    font-size: 13px;    /* Font chữ nhỏ xinh */
     background: #dc3545; 
     color: white; 
     border: none; 
-    box-shadow: 0 0 10px rgba(0,0,0,0.3); 
+    box-shadow: 0 0 8px rgba(0,0,0,0.4); 
     z-index: 10; 
     font-weight: bold; 
     pointer-events: auto; 
-    cursor: pointer; 
+    cursor: pointer;
+    text-align: center;
+    line-height: 40px; /* Căn giữa chữ */
 }
+
 #auto-shoot-btn.active { 
     background: #28a745; 
-    box-shadow: 0 0 15px lime; 
+    box-shadow: 0 0 12px lime; 
 }
         /* Joystick (Chỉ hiện trên Mobile) */
         #joystick-zone { position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); display: none; z-index: 10; touch-action: none; }
