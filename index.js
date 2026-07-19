@@ -1,4 +1,7 @@
-// Server của game - Quản lý trạng thái người chơi và phòng chat
+/**
+ * SERVER GAME - PHIÊN BẢN MỞ RỘNG
+ * Quản lý logic kết nối, phòng chat và trạng thái người chơi
+ */
 const express = require('express');
 const app = express();
 const http = require('http');
@@ -9,28 +12,29 @@ const path = require('path');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Lưu trữ dữ liệu người chơi
+// Trạng thái chung của toàn bộ người chơi trong game
 let players = {};
-// Lưu lịch sử chat để hiển thị cho người mới
 let chatHistory = []; 
 
 io.on('connection', (socket) => {
-    // Sự kiện khi người chơi kết nối
+    console.log(`[Hệ thống] Kết nối mới từ: ${socket.id}`);
+
+    // Sự kiện người chơi tham gia
     socket.on('join', (data) => {
         players[socket.id] = { 
             id: socket.id, 
             name: data.name, 
             color: data.color, 
-            x: 400, 
-            y: 300, 
+            x: 1000, // Spawn ở giữa map (Map mới là 2000x2000)
+            y: 1000, 
             chat: "",
-            isSprinting: false // Trạng thái chạy nhanh
+            isSprinting: false 
         };
         socket.emit('initChat', chatHistory); 
         io.emit('update', players);
     });
 
-    // Cập nhật vị trí từ Client
+    // Cập nhật vị trí và trạng thái chạy
     socket.on('move', (data) => {
         if (players[socket.id]) {
             players[socket.id].x = data.x;
@@ -40,7 +44,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Xử lý tin nhắn chat
+    // Xử lý chat
     socket.on('chat', (msg) => {
         if (players[socket.id]) {
             const entry = { name: players[socket.id].name, msg: msg };
@@ -49,7 +53,7 @@ io.on('connection', (socket) => {
             players[socket.id].chat = msg;
             io.emit('update', players);
             io.emit('newChat', entry);
-            // Xóa tin nhắn trên đầu sau 4 giây
+            // Xóa chat trên đầu sau 4s
             setTimeout(() => { 
                 if(players[socket.id]) players[socket.id].chat = ""; 
                 io.emit('update', players); 
@@ -57,11 +61,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Xử lý khi ngắt kết nối
+    // Ngắt kết nối
     socket.on('disconnect', () => { 
         delete players[socket.id]; 
         io.emit('update', players); 
     });
 });
 
-server.listen(3000, () => console.log('Server đã khởi động tại cổng 3000'));
+// Chạy server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server đang chạy tại port ${PORT}`));
