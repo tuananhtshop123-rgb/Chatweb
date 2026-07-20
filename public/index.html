@@ -3,119 +3,530 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Game Online</title>
+    <title>RPG Action Online</title>
     <style>
-        body { margin: 0; background: #90EE90; font-family: sans-serif; overflow: hidden; touch-action: none; }
-        #lobby { position: absolute; top:0; left:0; width:100%; height:100%; background: #E0F7FA; z-index: 100; display:flex; justify-content:center; align-items:center; }
+        body { margin: 0; background: #556B2F; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; touch-action: none; user-select: none; }
+        
+        /* Lobby UI */
+        #lobby { position: absolute; top:0; left:0; width:100%; height:100%; background: radial-gradient(circle, #E0F7FA, #80DEEA); z-index: 1000; display:flex; justify-content:center; align-items:center; }
+        .box { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; width: 300px; }
+        .box h1 { margin-top: 0; color: #333; }
+        #nameInput { width: 90%; padding: 10px; margin: 10px 0; border: 2px solid #ccc; border-radius: 8px; outline: none; font-size: 16px; }
+        .color-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; margin: 5px; display: inline-block; transition: transform 0.2s; }
+        .color-btn.active { transform: scale(1.2); border: 2px solid black; }
+        .play-btn { background: #4CAF50; color: white; border: none; padding: 12px 40px; font-size: 18px; border-radius: 25px; cursor: pointer; font-weight: bold; margin-top: 15px; box-shadow: 0 4px 10px rgba(76,175,80,0.4); }
+        
         #game-layer { display: none; }
         
-        /* Mobile Chat Center */
-        #chat-ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 80%; max-width: 300px; }
-        #chat-log { height: 100px; background: rgba(0,0,0,0.5); color: white; padding: 5px; overflow-y: auto; font-size: 12px; }
+        /* Chat UI */
+        #chat-ui { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 300px; z-index: 10; transition: opacity 0.3s; }
+        #chat-log { height: 120px; background: rgba(0,0,0,0.6); color: white; padding: 10px; overflow-y: auto; font-size: 13px; border-radius: 8px; margin-bottom: 5px; text-shadow: 1px 1px 0 #000; }
+        #chat-input { width: 100%; padding: 10px; border-radius: 8px; border: none; display: none; background: rgba(255,255,255,0.9); font-weight: bold; outline: none; }
         
-        /* D-Pad Mobile */
-        #d-pad { position: absolute; bottom: 50px; left: 20px; display: none; }
-        .d-btn { width: 50px; height: 50px; background: rgba(255,255,255,0.5); border-radius: 5px; margin: 2px; }
+        /* Toolbar (Vũ khí) */
+        #toolbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 12px; z-index: 10; }
+        .slot { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border: 2px solid #ccc; border-radius: 8px; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; font-size: 12px; transition: 0.2s; }
+        .slot.active { border-color: gold; background: rgba(255,215,0,0.3); box-shadow: 0 0 15px gold; }
         
-        /* Sprint & Chat Button Mobile */
-        #mobile-btns { position: absolute; bottom: 50px; right: 20px; display: none; }
+        /* Mobile Controls */
+        #d-pad { position: absolute; bottom: 50px; left: 20px; display: none; z-index: 10; }
+        .d-row { display: flex; justify-content: center; }
+        .d-btn { width: 60px; height: 60px; background: rgba(255,255,255,0.3); border-radius: 50%; margin: 5px; border: 2px solid rgba(255,255,255,0.5); color: white; font-size: 24px; }
+        
+        #action-btns { position: absolute; bottom: 30px; right: 20px; display: none; flex-wrap: wrap; width: 150px; justify-content: flex-end; z-index: 10; }
+        .act-btn { width: 60px; height: 60px; border-radius: 50%; background: rgba(0,0,0,0.5); color: white; border: 2px solid #ccc; margin: 5px; font-weight: bold; cursor: pointer; }
+        .act-btn.skill { border-radius: 10px; width: 70px; font-size: 16px; background: rgba(220,20,60,0.6); }
+        .act-btn.auto { background: rgba(75,0,130,0.6); }
+        
+        /* Nút ẩn chat mobile */
+        #hide-chat-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; border: none; padding: 10px; border-radius: 5px; z-index: 20; display: none; }
     </style>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div id="lobby"><div class="box"><h1>Vào Game</h1><input id="nameInput"><button onclick="play()">PLAY</button></div></div>
-    <div id="game-layer">
-        <canvas id="canvas"></canvas>
-        <div id="chat-ui"><div id="chat-log"></div><input id="chat-input" placeholder="Chat..."></div>
-        <div id="d-pad"><button class="d-btn" ontouchstart="keys['w']=true" ontouchend="keys['w']=false">▲</button><br><button class="d-btn" ontouchstart="keys['a']=true" ontouchend="keys['a']=false">◀</button><button class="d-btn" ontouchstart="keys['s']=true" ontouchend="keys['s']=false">▼</button><button class="d-btn" ontouchstart="keys['d']=true" ontouchend="keys['d']=false">▶</button></div>
-        <div id="mobile-btns"><button onclick="toggleSprint()">Chạy</button><button onclick="toggleChat()">💬</button></div>
+
+<div id="lobby">
+    <div class="box">
+        <h1>TẠO NHÂN VẬT</h1>
+        <input id="nameInput" placeholder="Nhập tên của bạn...">
+        <div id="colors">
+            <div class="color-btn active" style="background:#FF3333;" onclick="selectColor(this, '#FF3333')"></div>
+            <div class="color-btn" style="background:#3388FF;" onclick="selectColor(this, '#3388FF')"></div>
+            <div class="color-btn" style="background:#33FF55;" onclick="selectColor(this, '#33FF55')"></div>
+            <div class="color-btn" style="background:#FF33FF;" onclick="selectColor(this, '#FF33FF')"></div>
+            <div class="color-btn" style="background:#FFFF33;" onclick="selectColor(this, '#FFFF33')"></div>
+            <div class="color-btn" style="background:#33FFFF;" onclick="selectColor(this, '#33FFFF')"></div>
+        </div>
+        <button class="play-btn" onclick="play()">VÀO GAME</button>
     </div>
+</div>
+
+<div id="game-layer">
+    <canvas id="canvas"></canvas>
+    
+    <button id="hide-chat-btn" onclick="toggleChatUI()">👁️ Ẩn Chat</button>
+    
+    <div id="chat-ui">
+        <div id="chat-log"></div>
+        <input id="chat-input" placeholder="Nhập tin nhắn rồi nhấn Enter...">
+    </div>
+
+    <div id="toolbar">
+        <div id="slot-1" class="slot" onclick="toggleWeapon()"><span>[1]</span><span style="font-size:16px;">👊</span>Nắm đấm</div>
+    </div>
+
+    <div id="d-pad">
+        <div class="d-row"><button class="d-btn" ontouchstart="keys['w']=true" ontouchend="keys['w']=false">▲</button></div>
+        <div class="d-row">
+            <button class="d-btn" ontouchstart="keys['a']=true" ontouchend="keys['a']=false">◀</button>
+            <button class="d-btn" style="visibility:hidden;">.</button>
+            <button class="d-btn" ontouchstart="keys['d']=true" ontouchend="keys['d']=false">▶</button>
+        </div>
+        <div class="d-row"><button class="d-btn" ontouchstart="keys['s']=true" ontouchend="keys['s']=false">▼</button></div>
+    </div>
+    
+    <div id="action-btns">
+        <button class="act-btn skill" onclick="useSkill('Z')" id="btn-z" style="display:none;">Z - Phá</button>
+        <button class="act-btn skill" onclick="useSkill('X')" id="btn-x" style="display:none;">X - Đấm</button>
+        <button class="act-btn auto" onclick="toggleAuto()" id="btn-auto" style="display:none;">Auto</button>
+        <button class="act-btn" onclick="toggleSprintMobile()" id="btn-sprint">Chạy</button>
+        <button class="act-btn" ontouchstart="jump()" style="background:#2196F3;">Nhảy</button>
+        <button class="act-btn" onclick="focusChat()">💬</button>
+    </div>
+</div>
 
 <script>
     const socket = io();
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const MAP_SIZE = 2000;
-    let players = {}, myLocalPos = { x: 1000, y: 1000 }, isSprinting = false, keys = {};
-    let particles = []; // Hệ thống bụi
+    const MAP_SIZE = 1500;
+    
+    // Trạng thái cục bộ
+    let players = {}, monsters = [];
+    let myPos = { x: 750, y: 750, z: 0 };
+    let myColor = '#FF3333';
+    
+    // Hệ thống Vật lý / Di chuyển
+    let velZ = 0, gravity = -2, isGrounded = true;
+    let isSprinting = false, isEquipped = false, isTyping = false, autoMode = false;
+    let keys = {};
+    let mouseX = 0, mouseY = 0;
+    
+    // Hiệu ứng hình ảnh
+    let particles = [];
+    let skillsFX = [];
+    let deco = [];
+
+    // --- LOGIC LOBBY ---
+    function selectColor(btn, color) {
+        document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        myColor = color;
+    }
 
     function play() {
-        const name = document.getElementById('nameInput').value || "Người lạ";
-        socket.emit('join', { name, color: '#3357FF' });
+        const name = document.getElementById('nameInput').value || "Hero_" + Math.floor(Math.random()*1000);
+        socket.emit('join', { name, color: myColor });
         document.getElementById('lobby').style.display = 'none';
         document.getElementById('game-layer').style.display = 'block';
-        if('ontouchstart' in window) { document.getElementById('d-pad').style.display = 'block'; document.getElementById('mobile-btns').style.display = 'block'; }
-    }
-
-    function toggleSprint() { isSprinting = !isSprinting; }
-    function toggleChat() { document.getElementById('chat-input').style.display = 'block'; document.getElementById('chat-input').focus(); }
-
-    window.onkeydown = e => { if(e.key === 'Shift') isSprinting = !isSprinting; keys[e.key] = true; };
-    window.onkeyup = e => keys[e.key] = false;
-
-    // --- CÁC HÀM VẼ CHUYÊN BIỆT ---
-    function drawHouse() {
-        ctx.fillStyle = "#8B4513";
-        ctx.fillRect(MAP_SIZE/2 - 50, MAP_SIZE/2 - 50, 100, 100); // Thân nhà
-        ctx.fillStyle = "red";
-        ctx.beginPath(); ctx.moveTo(MAP_SIZE/2 - 60, MAP_SIZE/2 - 50); ctx.lineTo(MAP_SIZE/2 + 60, MAP_SIZE/2 - 50); ctx.lineTo(MAP_SIZE/2, MAP_SIZE/2 - 120); ctx.fill(); // Mái
-    }
-
-    function drawMiniMap() {
-        const size = 150;
-        ctx.save();
-        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(canvas.width - size - 10, 10, size, size);
-        // Vẽ chính mình
-        ctx.fillStyle = "yellow";
-        ctx.fillRect(canvas.width - size - 10 + (myLocalPos.x/MAP_SIZE)*size, 10 + (myLocalPos.y/MAP_SIZE)*size, 5, 5);
-        ctx.restore();
-    }
-
-    function createDust() {
-        if(isSprinting && (keys['w']||keys['a']||keys['s']||keys['d'])) {
-            particles.push({x: myLocalPos.x, y: myLocalPos.y + 40, alpha: 1});
+        
+        generateEnvironment();
+        
+        if('ontouchstart' in window) {
+            document.getElementById('d-pad').style.display = 'block';
+            document.getElementById('action-btns').style.display = 'flex';
+            document.getElementById('hide-chat-btn').style.display = 'block';
         }
-        particles.forEach((p, i) => {
-            p.alpha -= 0.05; ctx.fillStyle = `rgba(200,200,200,${p.alpha})`;
-            ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
-            if(p.alpha <= 0) particles.splice(i, 1);
+    }
+
+    // --- MÔI TRƯỜNG THIÊN NHIÊN (Giống thật) ---
+    function generateEnvironment() {
+        for(let i=0; i<150; i++) {
+            deco.push({
+                x: Math.random()*MAP_SIZE, y: Math.random()*MAP_SIZE,
+                type: Math.random() > 0.15 ? 'grass' : 'flower',
+                scale: 0.5 + Math.random()*0.5
+            });
+        }
+    }
+
+    function drawEnvironment() {
+        ctx.fillStyle = '#6B8E23'; // Nền map
+        ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+        
+        deco.forEach(d => {
+            ctx.save();
+            ctx.translate(d.x, d.y);
+            ctx.scale(d.scale, d.scale);
+            if(d.type === 'grass') {
+                ctx.fillStyle = '#228B22';
+                ctx.beginPath();
+                ctx.moveTo(0, 10); ctx.quadraticCurveTo(-10, -10, -5, -20); ctx.quadraticCurveTo(0, 0, 5, 10); // Cỏ trái
+                ctx.moveTo(5, 10); ctx.quadraticCurveTo(5, -15, 10, -25); ctx.quadraticCurveTo(15, -5, 15, 10); // Cỏ giữa
+                ctx.fill();
+            } else {
+                // Hoa 5 cánh
+                ctx.fillStyle = 'white';
+                for(let j=0; j<5; j++) {
+                    ctx.rotate((Math.PI*2)/5);
+                    ctx.beginPath(); ctx.ellipse(0, -8, 4, 8, 0, 0, Math.PI*2); ctx.fill();
+                }
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill();
+            }
+            ctx.restore();
         });
     }
 
-    socket.on('update', data => players = data);
+    // --- ĐIỀU KHIỂN & INPUT ---
+    window.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+    
+    window.addEventListener('keydown', e => {
+        if (e.key === '/') {
+            e.preventDefault();
+            focusChat();
+            return;
+        }
+        if (e.key === 'Enter') {
+            if(isTyping) {
+                const val = document.getElementById('chat-input').value.trim();
+                if(val) socket.emit('chat', val);
+                document.getElementById('chat-input').value = '';
+                document.getElementById('chat-input').style.display = 'none';
+                isTyping = false;
+            }
+            return;
+        }
+        if (isTyping) return; // Khóa phím khi đang chat
+        
+        if (e.key === 'Shift') isSprinting = !isSprinting;
+        if (e.key === ' ' && isGrounded) jump();
+        if (e.key === '1') toggleWeapon();
+        if (e.key.toLowerCase() === 'z' && isEquipped) useSkill('Z');
+        if (e.key.toLowerCase() === 'x' && isEquipped) useSkill('X');
+        
+        keys[e.key.toLowerCase()] = true;
+    });
 
-    function draw() {
-        ctx.clearRect(0,0, canvas.width, canvas.height);
-        let camX = myLocalPos.x - canvas.width/2;
-        let camY = myLocalPos.y - canvas.height/2;
-        ctx.save(); ctx.translate(-camX, -camY);
+    window.addEventListener('keyup', e => {
+        keys[e.key.toLowerCase()] = false;
+    });
 
-        drawHouse(); // Vẽ nhà ở giữa map
-        createDust(); // Vẽ bụi
+    function jump() {
+        if(isGrounded) { velZ = 15; isGrounded = false; }
+    }
 
-        for(let id in players) {
-            let p = players[id];
-            let rx = (id === socket.id) ? myLocalPos.x : p.x;
-            let ry = (id === socket.id) ? myLocalPos.y : p.y;
-            ctx.fillStyle = p.color; ctx.fillRect(rx, ry, 30, 50);
-            ctx.strokeRect(rx, ry, 30, 50);
-            ctx.fillText(p.name, rx, ry - 10);
+    function toggleSprintMobile() {
+        isSprinting = !isSprinting;
+        document.getElementById('btn-sprint').style.background = isSprinting ? 'orange' : 'rgba(0,0,0,0.5)';
+    }
+
+    function toggleWeapon() {
+        isEquipped = !isEquipped;
+        document.getElementById('slot-1').className = isEquipped ? 'slot active' : 'slot';
+        document.getElementById('btn-z').style.display = isEquipped ? 'block' : 'none';
+        document.getElementById('btn-x').style.display = isEquipped ? 'block' : 'none';
+        document.getElementById('btn-auto').style.display = isEquipped ? 'block' : 'none';
+    }
+
+    function focusChat() {
+        const input = document.getElementById('chat-input');
+        input.style.display = 'block';
+        input.focus();
+        isTyping = true;
+    }
+    
+    let chatUIVisible = true;
+    function toggleChatUI() {
+        chatUIVisible = !chatUIVisible;
+        document.getElementById('chat-ui').style.opacity = chatUIVisible ? '1' : '0';
+        document.getElementById('chat-ui').style.pointerEvents = chatUIVisible ? 'auto' : 'none';
+    }
+
+    function toggleAuto() {
+        autoMode = !autoMode;
+        document.getElementById('btn-auto').style.boxShadow = autoMode ? '0 0 15px purple' : 'none';
+    }
+
+    // --- SKILLS & HIỆU ỨNG ---
+    let cooldowns = { Z: 0, X: 0 };
+    
+    function useSkill(type) {
+        if (cooldowns[type] > Date.now()) return;
+        
+        let targetX = myPos.x, targetY = myPos.y;
+        
+        if (type === 'Z') {
+            // Animation nhảy mạnh lên rồi rớt xuống
+            velZ = 20; 
+            isGrounded = false;
+            cooldowns['Z'] = Date.now() + 3000;
+            // Phát tín hiệu khi chạm đất (giả lập delay)
+            setTimeout(() => { socket.emit('skill', { type: 'Z' }); }, 500);
+        }
+        
+        if (type === 'X') {
+            // Lấy tọa độ chuột chuyển đổi sang tọa độ map
+            let camX = myPos.x - canvas.width/2;
+            let camY = myPos.y - canvas.height/2;
+            targetX = mouseX + camX;
+            targetY = mouseY + camY;
+            cooldowns['X'] = Date.now() + 1500;
+            socket.emit('skill', { type: 'X', targetX, targetY });
+        }
+    }
+
+    // Lắng nghe hiệu ứng từ server
+    socket.on('skillEffect', data => {
+        if (data.type === 'Z') {
+            // Sóng xung kích tròn
+            skillsFX.push({ type: 'shockwave', x: data.x, y: data.y, radius: 10, maxRadius: 150, alpha: 1, color: '#FF4500' });
+            // Rung màn hình nhẹ nếu ở gần
+            let dist = Math.hypot(myPos.x - data.x, myPos.y - data.y);
+            if(dist < 300) shakeScreen();
+        }
+        if (data.type === 'X') {
+            // Nắm đấm khí bay tới
+            let angle = Math.atan2(data.targetY - data.y, data.targetX - data.x);
+            skillsFX.push({ 
+                type: 'projectile', x: data.x, y: data.y, 
+                vx: Math.cos(angle)*15, vy: Math.sin(angle)*15, 
+                life: 30, angle: angle 
+            });
+        }
+    });
+
+    let shake = 0;
+    function shakeScreen() { shake = 10; }
+
+    function drawEffects() {
+        // Bụi chạy
+        if (isGrounded && isSprinting && (keys['w']||keys['a']||keys['s']||keys['d'])) {
+            particles.push({x: myPos.x + (Math.random()-0.5)*20, y: myPos.y + 20, alpha: 0.8, size: Math.random()*5+3});
+        }
+        
+        particles.forEach((p, i) => {
+            p.alpha -= 0.04;
+            p.y -= 1; // Bay nhẹ lên
+            ctx.fillStyle = `rgba(180, 180, 180, ${p.alpha})`;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+            if(p.alpha <= 0) particles.splice(i, 1);
+        });
+
+        skillsFX.forEach((fx, i) => {
+            if (fx.type === 'shockwave') {
+                fx.radius += 8; fx.alpha -= 0.05;
+                ctx.strokeStyle = `rgba(255, 69, 0, ${fx.alpha})`;
+                ctx.lineWidth = 5;
+                ctx.beginPath(); ctx.arc(fx.x, fx.y, fx.radius, 0, Math.PI*2); ctx.stroke();
+                
+                ctx.fillStyle = `rgba(255, 140, 0, ${fx.alpha*0.5})`;
+                ctx.beginPath(); ctx.arc(fx.x, fx.y, fx.radius*0.8, 0, Math.PI*2); ctx.fill();
+                
+                if(fx.alpha <= 0) skillsFX.splice(i, 1);
+            }
+            if (fx.type === 'projectile') {
+                fx.x += fx.vx; fx.y += fx.vy; fx.life--;
+                
+                ctx.save();
+                ctx.translate(fx.x, fx.y);
+                ctx.rotate(fx.angle);
+                // Vẽ nắm đấm khí (màu xanh ngọc)
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+                ctx.shadowColor = 'cyan'; ctx.shadowBlur = 15;
+                ctx.fillRect(-15, -20, 30, 40);
+                ctx.beginPath(); ctx.arc(15, -10, 10, 0, Math.PI*2); ctx.fill(); // Các khớp tay
+                ctx.beginPath(); ctx.arc(15, 10, 10, 0, Math.PI*2); ctx.fill();
+                ctx.restore();
+                
+                // Vệt đuôi
+                particles.push({x: fx.x, y: fx.y, alpha: 0.5, size: 8});
+                
+                if(fx.life <= 0) skillsFX.splice(i, 1);
+            }
+        });
+    }
+
+    // --- VẼ NHÂN VẬT & QUÁI ---
+    function drawCharacter(x, y, z, color, name, chat, isMov, isSprint, isEq) {
+        ctx.save();
+        
+        // Vẽ bóng
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(x, y + 25, 20, 8, 0, 0, Math.PI*2); ctx.fill();
+        
+        // Áp dụng Z-axis
+        ctx.translate(x, y - z);
+        
+        // Animation đi bộ (Tính góc lắc lư của tay chân)
+        let swing = isMov ? Math.sin(Date.now() / (isSprint ? 80 : 150)) * 20 : 0;
+        if(z > 0) swing = 0; // Đang nhảy thì không vung vẩy
+        
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        
+        // Chân trái
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-12, 10 - swing/2, 10, 20); ctx.strokeRect(-12, 10 - swing/2, 10, 20);
+        // Chân phải
+        ctx.fillRect(2, 10 + swing/2, 10, 20); ctx.strokeRect(2, 10 + swing/2, 10, 20);
+        
+        // Thân
+        ctx.fillStyle = color;
+        ctx.fillRect(-15, -15, 30, 35); ctx.strokeRect(-15, -15, 30, 35);
+        
+        // Tay trái
+        ctx.fillRect(-22, -15 + swing/2, 7, 25); ctx.strokeRect(-22, -15 + swing/2, 7, 25);
+        
+        // Tay phải (Nếu cầm melee thì giơ lên phía trước)
+        if (isEq) {
+            ctx.save();
+            ctx.translate(15, -10);
+            ctx.rotate(-Math.PI/4); // Giơ tay lên
+            ctx.fillRect(0, 0, 7, 25); ctx.strokeRect(0, 0, 7, 25);
+            ctx.restore();
+        } else {
+            ctx.fillRect(15, -15 - swing/2, 7, 25); ctx.strokeRect(15, -15 - swing/2, 7, 25);
+        }
+        
+        // Đầu
+        ctx.fillStyle = '#FFDAB9'; // Màu da
+        ctx.beginPath(); ctx.arc(0, -25, 12, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        
+        // Tên
+        ctx.fillStyle = 'white'; ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center'; ctx.shadowColor = 'black'; ctx.shadowBlur = 4;
+        ctx.fillText(name, 0, -45);
+        ctx.shadowBlur = 0; // Reset
+        
+        // Chat bong bóng
+        if (chat) {
+            ctx.fillStyle = 'white';
+            let txtWidth = ctx.measureText(chat).width;
+            ctx.fillRect(-txtWidth/2 - 5, -75, txtWidth + 10, 20);
+            ctx.fillStyle = 'black'; ctx.fillText(chat, 0, -61);
+        }
+        
+        ctx.restore();
+    }
+
+    function drawHouse() {
+        const hx = MAP_SIZE/2, hy = MAP_SIZE/2;
+        ctx.fillStyle = '#8B4513'; ctx.fillRect(hx-80, hy-80, 160, 140);
+        ctx.fillStyle = '#654321'; ctx.fillRect(hx-20, hy, 40, 60); // Cửa
+        ctx.fillStyle = '#8B0000';
+        ctx.beginPath(); ctx.moveTo(hx-100, hy-80); ctx.lineTo(hx+100, hy-80); ctx.lineTo(hx, hy-160); ctx.fill(); // Mái nhà
+    }
+
+    // --- CẬP NHẬT TỪ SERVER ---
+    socket.on('update', data => {
+        players = data.players;
+        monsters = data.monsters;
+    });
+
+    socket.on('newChat', c => { 
+        const log = document.getElementById('chat-log');
+        log.innerHTML += `<div><b>${c.name}:</b> ${c.msg}</div>`; 
+        log.scrollTop = log.scrollHeight;
+    });
+
+    // --- MAIN LOOP ---
+    function loop() {
+        // --- LOGIC DI CHUYỂN CỦA MÌNH (Client-side) ---
+        let isMov = false;
+        if (!isTyping) {
+            let speed = isSprinting ? 6 : 3;
+            if(keys['w']) { myPos.y -= speed; isMov = true; }
+            if(keys['s']) { myPos.y += speed; isMov = true; }
+            if(keys['a']) { myPos.x -= speed; isMov = true; }
+            if(keys['d']) { myPos.x += speed; isMov = true; }
+            
+            // Giới hạn bản đồ
+            myPos.x = Math.max(20, Math.min(MAP_SIZE - 20, myPos.x));
+            myPos.y = Math.max(20, Math.min(MAP_SIZE - 20, myPos.y));
         }
 
-        // Logic chạy
-        let speed = isSprinting ? 4 : 2;
-        if(keys['w']) myLocalPos.y -= speed;
-        if(keys['s']) myLocalPos.y += speed;
-        if(keys['a']) myLocalPos.x -= speed;
-        if(keys['d']) myLocalPos.x += speed;
-        socket.emit('move', {x: myLocalPos.x, y: myLocalPos.y, sprinting: isSprinting});
+        // Logic Nhảy (Z-axis)
+        if (!isGrounded) {
+            myPos.z += velZ;
+            velZ += gravity;
+            if (myPos.z <= 0) {
+                myPos.z = 0;
+                isGrounded = true;
+                velZ = 0;
+            }
+        }
+        
+        // Logic Auto Skill
+        if(autoMode && isEquipped) {
+            useSkill('Z'); useSkill('X');
+        }
+
+        // Gửi state lên server
+        socket.emit('updateState', { x: myPos.x, y: myPos.y, z: myPos.z, isMoving: isMov, isSprinting: isSprinting, equipped: isEquipped });
+
+        // --- RENDER ---
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+        
+        // Camera theo chân + Rung màn hình
+        let camX = myPos.x - canvas.width/2;
+        let camY = myPos.y - canvas.height/2;
+        if(shake > 0) { camX += (Math.random()-0.5)*10; camY += (Math.random()-0.5)*10; shake--; }
+        
+        ctx.save();
+        ctx.translate(-camX, -camY);
+
+        drawEnvironment();
+        drawHouse();
+        drawEffects();
+
+        // Vẽ quái vật
+        monsters.forEach(m => {
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath(); ctx.ellipse(m.x, m.y+20, 15, 6, 0, 0, Math.PI*2); ctx.fill(); // Bóng
+            
+            ctx.fillStyle = m.color;
+            ctx.fillRect(m.x-15, m.y-20, 30, 40);
+            ctx.strokeRect(m.x-15, m.y-20, 30, 40);
+            
+            // Vẽ sừng cho quái
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.moveTo(m.x-10, m.y-20); ctx.lineTo(m.x-15, m.y-30); ctx.lineTo(m.x-5, m.y-20); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(m.x+10, m.y-20); ctx.lineTo(m.x+15, m.y-30); ctx.lineTo(m.x+5, m.y-20); ctx.fill();
+        });
+
+        // Vẽ người chơi (Sắp xếp theo trục Y để cái nào ở dưới vẽ sau -> đè lên trên)
+        let sortedPlayers = Object.values(players).sort((a,b) => a.y - b.y);
+        
+        sortedPlayers.forEach(p => {
+            let px = (p.id === socket.id) ? myPos.x : p.x;
+            let py = (p.id === socket.id) ? myPos.y : p.y;
+            let pz = (p.id === socket.id) ? myPos.z : p.z;
+            let pMov = (p.id === socket.id) ? isMov : p.isMoving;
+            let pSpr = (p.id === socket.id) ? isSprinting : p.isSprinting;
+            let pEq = (p.id === socket.id) ? isEquipped : p.equipped;
+            
+            drawCharacter(px, py, pz, p.color, p.name, p.chat, pMov, pSpr, pEq);
+        });
 
         ctx.restore();
-        drawMiniMap();
-        requestAnimationFrame(draw);
+        
+        // Vẽ Mini-map tĩnh ở góc phải trên
+        const mapSizeUI = 120;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(canvas.width - mapSizeUI - 10, 10, mapSizeUI, mapSizeUI);
+        // Quái trên minimap (đỏ)
+        ctx.fillStyle = 'red';
+        monsters.forEach(m => { ctx.fillRect(canvas.width - mapSizeUI - 10 + (m.x/MAP_SIZE)*mapSizeUI, 10 + (m.y/MAP_SIZE)*mapSizeUI, 3, 3); });
+        // Người trên minimap (vàng)
+        ctx.fillStyle = 'yellow';
+        ctx.beginPath(); ctx.arc(canvas.width - mapSizeUI - 10 + (myPos.x/MAP_SIZE)*mapSizeUI, 10 + (myPos.y/MAP_SIZE)*mapSizeUI, 3, 0, Math.PI*2); ctx.fill();
+
+        requestAnimationFrame(loop);
     }
+    
     window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-    window.onresize(); draw();
+    window.onresize(); 
+    requestAnimationFrame(loop);
 </script>
 </body>
 </html>
