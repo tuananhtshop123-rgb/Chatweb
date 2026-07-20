@@ -3,21 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Blox RPG Action</title>
+    <title>BLUIT FROX</title>
     <style>
         body { margin: 0; background: #1a1a1a; font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; touch-action: none; user-select: none; }
         
-        /* Lobby */
-        #lobby { position: absolute; top:0; left:0; width:100%; height:100%; background: url('https://i.imgur.com/3YhYvQc.jpg') center/cover; z-index: 2000; display:flex; justify-content:center; align-items:center; }
-        .box { background: rgba(255,255,255,0.9); padding: 30px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); text-align: center; width: 320px; }
-        #nameInput { width: 90%; padding: 12px; margin: 15px 0; border: 2px solid #333; border-radius: 8px; font-size: 16px; font-weight:bold; }
-        .play-btn { background: #E53935; color: white; border: none; padding: 15px 50px; font-size: 20px; border-radius: 30px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        /* Đã fix nền Lobby để không bị lỗi ảnh nữa (dùng màu gradient siêu đẹp) */
+        #lobby { position: absolute; top:0; left:0; width:100%; height:100%; background: radial-gradient(circle, #87CEEB, #1E90FF); z-index: 2000; display:flex; justify-content:center; align-items:center; }
+        .box { background: rgba(255,255,255,0.95); padding: 30px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); text-align: center; width: 340px; }
+        .box h1 { margin-top: 0; color: #333; font-size: 32px; font-weight: 900; }
+        #nameInput { width: 90%; padding: 12px; margin: 10px 0 15px 0; border: 2px solid #333; border-radius: 8px; font-size: 16px; font-weight:bold; }
+        .play-btn { background: #E53935; color: white; border: none; padding: 15px 50px; font-size: 20px; border-radius: 30px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-top: 10px; width: 100%;}
         .play-btn:hover { background: #D32F2F; transform: scale(1.05); }
         #errMsg { color: red; font-weight: bold; display: none; margin-bottom: 10px; }
 
+        /* Nút chọn màu nhân vật */
+        #color-picker { margin-bottom: 15px; display: flex; justify-content: center; gap: 10px; }
+        .color-btn { width: 35px; height: 35px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .color-btn:hover { transform: scale(1.1); }
+        .color-btn.selected { border-color: #333; transform: scale(1.2); }
+
         #game-layer { display: none; }
 
-        /* UI MÁU VÀ CẤP ĐỘ CỦA MÌNH TẠI GIỮA MÀN HÌNH */
+        /* UI MÁU VÀ CẤP ĐỘ */
         #hud-center { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 350px; text-align: center; z-index: 10; text-shadow: 1px 1px 2px black; }
         .bar-bg { width: 100%; height: 25px; background: rgba(0,0,0,0.6); border-radius: 12px; border: 2px solid #555; overflow: hidden; position: relative; margin-bottom: 5px; }
         #hp-bar { height: 100%; background: linear-gradient(90deg, #d32f2f, #ff5252); width: 100%; transition: width 0.3s; }
@@ -33,16 +40,14 @@
         .slot { width: 65px; height: 65px; background: rgba(0,0,0,0.6); border: 2px solid #777; border-radius: 10px; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; position: relative; }
         .slot.active { border-color: #00FF00; box-shadow: 0 0 15px #00FF00; background: rgba(0,255,0,0.2); }
         
-        /* Mobile Joystick (Kiểu tròn trong tròn) */
+        /* Mobile Joystick */
         #joy-bg { position: absolute; bottom: 40px; left: 30px; width: 130px; height: 130px; background: rgba(255,255,255,0.2); border: 3px solid rgba(255,255,255,0.4); border-radius: 50%; display: none; z-index: 10; }
         #joy-knob { position: absolute; top: 35px; left: 35px; width: 60px; height: 60px; background: rgba(255,255,255,0.8); border-radius: 50%; pointer-events: none; }
 
-        /* Các nút Action (Mobile) sắp xếp dễ bấm */
+        /* Mobile Buttons */
         #action-btns { position: absolute; bottom: 30px; right: 20px; display: none; width: 180px; height: 180px; z-index: 10; }
         .act-btn { position: absolute; border-radius: 50%; color: white; font-weight: bold; font-size: 16px; border: 2px solid white; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.6); overflow: hidden; }
         .act-btn:active { transform: scale(0.9); }
-        
-        /* Cooldown Overlay */
         .cd-overlay { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: rgba(0, 0, 0, 0.7); transition: height 0.1s linear; }
         
         #btn-jump { bottom: 0; right: 0; width: 70px; height: 70px; background: #1976D2; }
@@ -55,7 +60,7 @@
         #chat-ui { position: absolute; top: 60px; right: 20px; width: 250px; z-index: 10; }
         #chat-log { height: 120px; background: rgba(0,0,0,0.5); color: white; padding: 10px; overflow-y: auto; font-size: 13px; border-radius: 8px; text-shadow: 1px 1px 0 #000; margin-bottom: 5px; }
         #chat-input { width: 100%; padding: 8px; border-radius: 5px; border: none; display: none; }
-        #minimap { position: absolute; top: 10px; right: 20px; width: 150px; height: 150px; border: 2px solid white; border-radius: 10px; z-index: 10; background: #1E88E5; } /* Nền xanh biển */
+        #minimap { position: absolute; top: 10px; right: 20px; width: 150px; height: 150px; border: 2px solid white; border-radius: 10px; z-index: 10; background: #1E88E5; } 
     </style>
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -63,9 +68,20 @@
 
 <div id="lobby">
     <div class="box">
-        <h1>BÁ BƯỚC ZONE 1</h1>
+        <h1>BLUIT FROX</h1>
         <div id="errMsg">Tên đã tồn tại!</div>
         <input id="nameInput" placeholder="Nhập tên nhân vật...">
+        
+        <!-- Bảng chọn màu đã được thêm lại -->
+        <div id="color-picker">
+            <div class="color-btn selected" style="background:#FF3333;" onclick="selectColor(this, '#FF3333')"></div>
+            <div class="color-btn" style="background:#3388FF;" onclick="selectColor(this, '#3388FF')"></div>
+            <div class="color-btn" style="background:#33FF55;" onclick="selectColor(this, '#33FF55')"></div>
+            <div class="color-btn" style="background:#FF33FF;" onclick="selectColor(this, '#FF33FF')"></div>
+            <div class="color-btn" style="background:#FFFF33;" onclick="selectColor(this, '#FFFF33')"></div>
+            <div class="color-btn" style="background:#FFFFFF;" onclick="selectColor(this, '#FFFFFF')"></div>
+        </div>
+
         <button class="play-btn" onclick="joinGame()">VÀO GAME</button>
     </div>
 </div>
@@ -94,16 +110,13 @@
         <div id="wp-2" class="slot" onclick="equip(2)"><span>[2]</span>Kiếm</div>
     </div>
 
-    <!-- PC Cooldown Display -->
     <div id="pc-cooldowns" style="position:absolute; bottom:100px; left:50%; transform:translateX(-50%); display:flex; gap:20px; z-index:10; color:white; font-weight:bold;">
         <div id="cd-z-txt">Z: Sẵn sàng</div>
         <div id="cd-x-txt">X: Sẵn sàng</div>
     </div>
 
-    <!-- Joystick Mobile -->
     <div id="joy-bg"><div id="joy-knob"></div></div>
     
-    <!-- Nút Action Mobile -->
     <div id="action-btns">
         <div class="act-btn" id="btn-z" onclick="mobileSkill('Z')">Z<div class="cd-overlay" id="cd-overlay-z"></div></div>
         <div class="act-btn" id="btn-x" onclick="mobileSkill('X')">X<div class="cd-overlay" id="cd-overlay-x"></div></div>
@@ -123,31 +136,34 @@
     let players = {}, monsters = [];
     let myPos = { x: 1200, y: 1200, z: 0 };
     let myData = null;
+    let myColor = '#FF3333'; // Màu mặc định
     
-    // Hệ thống Vật lý (Đã giảm tốc độ nhảy/rơi theo yêu cầu)
     let velZ = 0, gravity = -0.8, isGrounded = true;
     let isSprinting = false, currentWeapon = 1, autoMode = false;
     let keys = {}, mouseX = 0, mouseY = 0;
-    
-    // Joystick
     let joyActive = false, joyAngle = 0, joyMag = 0;
-    
-    // Hiệu ứng FX và Texts nổi
     let particles = [], skillsFX = [], floatingTexts = [];
-
-    // Cảnh vật thiên nhiên (Cỏ/Hoa)
     let deco = [];
+
+    // Tạo môi trường
     for(let i=0; i<300; i++) {
         let dx = ISL_MIN + Math.random()*(ISL_MAX - ISL_MIN);
         let dy = ISL_MIN + Math.random()*(ISL_MAX - ISL_MIN);
         deco.push({ x: dx, y: dy, type: Math.random()>0.2?'grass':'flower', scale: 0.5+Math.random()*0.5 });
     }
 
-    // --- LOBBY LÔGIC ---
+    // --- LOBBY CHỌN MÀU & ĐĂNG NHẬP ---
+    function selectColor(btn, color) {
+        document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        myColor = color;
+    }
+
     function joinGame() {
         let name = document.getElementById('nameInput').value.trim();
         if(!name) return;
-        socket.emit('join', { name: name, color: '#FF3333' }, (res) => {
+        
+        socket.emit('join', { name: name, color: myColor }, (res) => {
             if (res.success) {
                 document.getElementById('lobby').style.display = 'none';
                 document.getElementById('game-layer').style.display = 'block';
@@ -165,11 +181,10 @@
         });
     }
 
-    // --- JOYSTICK MOBILE ---
     function setupJoystick() {
         const joyBg = document.getElementById('joy-bg');
         const joyKnob = document.getElementById('joy-knob');
-        let cx, cy, rad = 35; // Bán kính
+        let cx, cy, rad = 35; 
         
         joyBg.addEventListener('touchstart', e => {
             joyActive = true;
@@ -194,7 +209,6 @@
         }
     }
 
-    // --- UI ĐỒNG BỘ TỪ SERVER (STATS & HP) ---
     socket.on('syncPlayer', (p) => {
         if(p.id === socket.id) {
             myData = p;
@@ -226,10 +240,9 @@
         document.getElementById('btn-auto').style.border = autoMode ? '3px solid #00FF00' : '2px solid white';
     }
 
-    // --- SKILLS & COMBAT ---
     let cds = { Z: 0, X: 0 };
-    let durations = { 1: { Z: 1000, X: 2000 }, 2: { Z: 1000, X: 1000 } }; // Nắm đấm & Kiếm
-    let isSpinning = false; // Dành cho chiêu X kiếm
+    let durations = { 1: { Z: 1000, X: 2000 }, 2: { Z: 1000, X: 1000 } }; 
+    let isSpinning = false; 
 
     window.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
     window.addEventListener('keydown', e => {
@@ -260,7 +273,6 @@
         
         cds[type] = now + durations[currentWeapon][type];
         
-        // Cập nhật UI Cooldown
         let overlay = document.getElementById(`cd-overlay-${type.toLowerCase()}`);
         if(overlay) {
             overlay.style.transition = 'none'; overlay.style.height = '100%';
@@ -270,18 +282,16 @@
         let targetX = mouseX + (myPos.x - canvas.width/2);
         let targetY = mouseY + (myPos.y - canvas.height/2);
 
-        // NẮM ĐẤM (1)
         if (currentWeapon === 1) {
             if (type === 'Z') {
-                velZ = 15; isGrounded = false; // Nhảy lên đập xuống
-                setTimeout(() => { socket.emit('skill', { type: 'FistZ' }); checkHitAOE(myPos.x, myPos.y, 150, 1.5); }, 600); // AOE rộng, Dmg x1.5
+                velZ = 15; isGrounded = false; 
+                setTimeout(() => { socket.emit('skill', { type: 'FistZ' }); checkHitAOE(myPos.x, myPos.y, 150, 1.5); }, 600); 
             }
             if (type === 'X') {
                 socket.emit('skill', { type: 'FistX', tx: targetX, ty: targetY });
                 checkHitLine(myPos.x, myPos.y, targetX, targetY, 200, 1);
             }
         }
-        // KIẾM (2)
         if (currentWeapon === 2) {
             if (type === 'Z') {
                 socket.emit('skill', { type: 'SwordZ', tx: targetX, ty: targetY });
@@ -289,10 +299,10 @@
             }
             if (type === 'X') {
                 isSpinning = true;
-                socket.emit('skill', { type: 'SwordX' }); // Chém liên tục 2s
+                socket.emit('skill', { type: 'SwordX' }); 
                 let spinCount = 0;
                 let spinInterval = setInterval(() => {
-                    checkHitAOE(myPos.x, myPos.y, 100, 0.5); // Dmg x0.5 nhưng đánh nhiều lần
+                    checkHitAOE(myPos.x, myPos.y, 100, 0.5); 
                     spinCount++;
                     if(spinCount >= 4) { clearInterval(spinInterval); isSpinning = false; }
                 }, 500);
@@ -300,7 +310,6 @@
         }
     }
 
-    // Gửi tín hiệu đánh trúng lên Server
     function checkHitAOE(x, y, radius, mult) {
         monsters.forEach(m => {
             if(m.hp > 0 && Math.hypot(m.x - x, m.y - y) < radius) socket.emit('hitMonster', { mobId: m.id, multiplier: mult });
@@ -310,14 +319,12 @@
         let angle = Math.atan2(ty - sy, tx - sx);
         let endX = sx + Math.cos(angle)*range, endY = sy + Math.sin(angle)*range;
         monsters.forEach(m => {
-            if(m.hp > 0 && Math.hypot(m.x - endX, m.y - endY) < 60) socket.emit('hitMonster', { mobId: m.id, multiplier: mult }); // Châm chước khoảng cách
+            if(m.hp > 0 && Math.hypot(m.x - endX, m.y - endY) < 60) socket.emit('hitMonster', { mobId: m.id, multiplier: mult }); 
         });
     }
 
-    // Auto Skill Loop
     setInterval(() => {
         if(autoMode && myData && !myData.isDead) {
-            // Tìm quái gần nhất
             let closest = null, minDist = 9999;
             monsters.forEach(m => {
                 if(m.hp > 0) {
@@ -326,7 +333,6 @@
                 }
             });
             if(closest && minDist < 300) {
-                // Giả lập chuột tới quái
                 mouseX = closest.x - (myPos.x - canvas.width/2);
                 mouseY = closest.y - (myPos.y - canvas.height/2);
                 if(Date.now() >= cds['Z']) mobileSkill('Z');
@@ -335,10 +341,8 @@
         }
     }, 500);
 
-    // --- HIỆU ỨNG TỪ SERVER ĐỔ VỀ ---
     socket.on('skillEffect', d => {
         if (d.type === 'FistZ') {
-            // Luồng khí trắng đập xuống đất lan rộng
             skillsFX.push({ type: 'whiteAura', x: d.px, y: d.py, radius: 10, alpha: 1 });
         }
         if (d.type === 'FistX') {
@@ -350,7 +354,7 @@
             skillsFX.push({ type: 'projSword', x: d.px, y: d.py, vx: Math.cos(ang)*18, vy: Math.sin(ang)*18, life: 20, angle: ang });
         }
         if (d.type === 'SwordX') {
-            skillsFX.push({ type: 'spinSword', x: d.px, y: d.py, angle: 0, life: 60, id: d.playerId }); // Tồn tại 2s (60 frame)
+            skillsFX.push({ type: 'spinSword', x: d.px, y: d.py, angle: 0, life: 60, id: d.playerId }); 
         }
     });
 
@@ -361,31 +365,24 @@
     socket.on('updatePlayers', p => players = p);
     socket.on('updateMonsters', m => monsters = m);
 
-    // --- RENDER VÀ ĐỒ HỌA CHÍNH ---
     function drawMap() {
-        // Nền Biển bao quanh
         ctx.fillStyle = '#1E88E5'; ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
-        // Sóng biển
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
         for(let i=0; i<50; i++) { ctx.fillRect(Math.random()*MAP_SIZE, Math.random()*MAP_SIZE, 30, 4); }
         
-        // Đảo cỏ ở giữa
         ctx.fillStyle = '#6B8E23'; 
         ctx.fillRect(ISL_MIN, ISL_MIN, ISL_MAX - ISL_MIN, ISL_MAX - ISL_MIN);
         
-        // Thuyền (Yêu cầu lv 1000)
         ctx.save(); ctx.translate(350, 1200);
-        ctx.fillStyle = '#8B4513'; ctx.beginPath(); ctx.ellipse(0, 0, 40, 80, 0, 0, Math.PI*2); ctx.fill(); // Thân thuyền
-        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.moveTo(0, -60); ctx.lineTo(40, 0); ctx.lineTo(0, 40); ctx.fill(); // Buồm
+        ctx.fillStyle = '#8B4513'; ctx.beginPath(); ctx.ellipse(0, 0, 40, 80, 0, 0, Math.PI*2); ctx.fill(); 
+        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.moveTo(0, -60); ctx.lineTo(40, 0); ctx.lineTo(0, 40); ctx.fill(); 
         ctx.fillStyle = 'black'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center';
         ctx.fillText("Yêu cầu LV 1000", 0, 100);
         ctx.restore();
 
-        // Nhà ở giữa đảo
         ctx.fillStyle = '#5C4033'; ctx.fillRect(1150, 1150, 100, 100);
         ctx.fillStyle = 'red'; ctx.beginPath(); ctx.moveTo(1140, 1150); ctx.lineTo(1260, 1150); ctx.lineTo(1200, 1080); ctx.fill();
 
-        // Vẽ cỏ hoa
         deco.forEach(d => {
             ctx.save(); ctx.translate(d.x, d.y); ctx.scale(d.scale, d.scale);
             if(d.type === 'grass') { ctx.fillStyle = '#228B22'; ctx.beginPath(); ctx.moveTo(0,10); ctx.lineTo(-10,-10); ctx.lineTo(0,0); ctx.lineTo(10,-10); ctx.fill(); }
@@ -402,58 +399,50 @@
         let isInWater = (px < ISL_MIN || px > ISL_MAX || py < ISL_MIN || py > ISL_MAX);
         
         ctx.save();
-        // Bóng
         if(!isInWater) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(px, py+20, 15, 6, 0, 0, Math.PI*2); ctx.fill(); }
 
-        ctx.translate(px, py - pz + (isInWater ? 15 : 0)); // Chìm xuống nếu ở dưới nước
+        ctx.translate(px, py - pz + (isInWater ? 15 : 0)); 
         
-        // Vòng sóng nước khi bơi
         if(isInWater) {
             ctx.strokeStyle = 'white'; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.ellipse(0, 5, 25, 10, 0, 0, Math.PI*2); ctx.stroke();
         }
 
         let swing = p.isMoving ? Math.sin(Date.now()/(p.isSprinting?80:150))*15 : 0;
-        if(pz>0 || isInWater) swing = 0; // Đang nhảy hoặc bơi thì k vung chân
+        if(pz>0 || isInWater) swing = 0; 
 
         ctx.strokeStyle = 'black'; ctx.lineWidth = 2;
         
-        // Chỉ vẽ chân nếu không bơi
         if(!isInWater) {
             ctx.fillStyle = '#333';
             ctx.fillRect(-10, 10 - swing, 8, 15); ctx.strokeRect(-10, 10 - swing, 8, 15);
             ctx.fillRect(2, 10 + swing, 8, 15); ctx.strokeRect(2, 10 + swing, 8, 15);
         }
         
-        // Thân
         ctx.fillStyle = p.color; ctx.fillRect(-12, -15, 24, 25); ctx.strokeRect(-12, -15, 24, 25);
         
-        // Tay
-        if(isInWater) { // Animation bơi (giơ tay chéo)
+        if(isInWater) { 
             ctx.save(); ctx.translate(-15, -10); ctx.rotate(-Math.PI/3); ctx.fillRect(0,0,6,20); ctx.restore();
             ctx.save(); ctx.translate(15, -10); ctx.rotate(Math.PI/3); ctx.fillRect(0,0,6,20); ctx.restore();
         } else {
-            ctx.fillRect(-18, -15 + swing, 6, 20); ctx.strokeRect(-18, -15 + swing, 6, 20); // Tay trái
+            ctx.fillRect(-18, -15 + swing, 6, 20); ctx.strokeRect(-18, -15 + swing, 6, 20); 
             
-            // Cầm vũ khí (Tay phải)
             ctx.save();
             ctx.translate(12, -15);
-            if(p.weapon === 1) { // Đấm
+            if(p.weapon === 1) { 
                 ctx.rotate(-Math.PI/4); ctx.fillRect(0,0,6,20); ctx.strokeRect(0,0,6,20);
-                ctx.fillStyle = '#F4A460'; ctx.beginPath(); ctx.arc(3, 20, 5, 0, Math.PI*2); ctx.fill(); // Găng tay
-            } else if(p.weapon === 2) { // Kiếm
+                ctx.fillStyle = '#F4A460'; ctx.beginPath(); ctx.arc(3, 20, 5, 0, Math.PI*2); ctx.fill(); 
+            } else if(p.weapon === 2) { 
                 ctx.rotate(-Math.PI/2); ctx.fillRect(0,0,6,20); ctx.strokeRect(0,0,6,20);
-                ctx.fillStyle = 'silver'; ctx.fillRect(0, 15, 30, 4); // Lưỡi kiếm
-            } else { // Không
+                ctx.fillStyle = 'silver'; ctx.fillRect(0, 15, 30, 4); 
+            } else { 
                 ctx.fillRect(0, -swing, 6, 20); ctx.strokeRect(0, -swing, 6, 20);
             }
             ctx.restore();
         }
 
-        // Đầu
         ctx.fillStyle = '#FFDAB9'; ctx.beginPath(); ctx.arc(0, -22, 10, 0, Math.PI*2); ctx.fill(); ctx.stroke();
         
-        // Thanh máu nhỏ trên đầu
         if(!isMe) {
             ctx.fillStyle = 'black'; ctx.fillRect(-15, -45, 30, 4);
             ctx.fillStyle = 'red'; ctx.fillRect(-15, -45, 30 * (p.hp/p.maxHp), 4);
@@ -462,14 +451,12 @@
 
         ctx.restore();
         
-        // Vẽ hiệu ứng spin kiếm quanh người (Chiêu X Kiếm)
         if(isMe && isSpinning) {
-            skillsFX.push({ type: 'spinSword', x: px, y: py, angle: Math.random()*Math.PI*2, life: 1, id: p.id }); // Fake FX để vẽ nhanh
+            skillsFX.push({ type: 'spinSword', x: px, y: py, angle: Math.random()*Math.PI*2, life: 1, id: p.id }); 
         }
     }
 
     function drawEffects() {
-        // Bụi khói dưới chân khi chạy (Không bơi)
         if(isGrounded && isSprinting && (keys['w']||keys['a']||keys['s']||keys['d'] || joyActive)) {
             let inWater = (myPos.x < ISL_MIN || myPos.x > ISL_MAX || myPos.y < ISL_MIN || myPos.y > ISL_MAX);
             if(!inWater) particles.push({ x: myPos.x+(Math.random()-0.5)*15, y: myPos.y+15, a: 0.8 });
@@ -481,7 +468,6 @@
             if(p.a <= 0) particles.splice(i, 1);
         });
 
-        // Kỹ năng
         skillsFX.forEach((f, i) => {
             if(f.type === 'whiteAura') {
                 f.radius += 15; f.alpha -= 0.04;
@@ -496,7 +482,7 @@
                 if(f.type === 'projFist') {
                     ctx.fillStyle = 'rgba(255,165,0,0.8)'; ctx.beginPath(); ctx.ellipse(0, 0, 20, 15, 0, 0, Math.PI*2); ctx.fill();
                 } else {
-                    ctx.fillStyle = 'rgba(0,255,255,0.8)'; ctx.beginPath(); ctx.moveTo(-10,-20); ctx.quadraticCurveTo(20,0, -10,20); ctx.quadraticCurveTo(10,0, -10,-20); ctx.fill(); // Lưỡi kiếm khí
+                    ctx.fillStyle = 'rgba(0,255,255,0.8)'; ctx.beginPath(); ctx.moveTo(-10,-20); ctx.quadraticCurveTo(20,0, -10,20); ctx.quadraticCurveTo(10,0, -10,-20); ctx.fill(); 
                 }
                 ctx.restore();
                 if(f.life <= 0) skillsFX.splice(i, 1);
@@ -513,7 +499,6 @@
             }
         });
 
-        // Floating Texts (Damge / Exp)
         floatingTexts.forEach((ft, i) => {
             ft.y += ft.dy; ft.alpha -= 0.02;
             ctx.fillStyle = ft.color; ctx.globalAlpha = Math.max(0, ft.alpha);
@@ -526,27 +511,22 @@
 
     function renderMiniMap() {
         mapCtx.clearRect(0,0,150,150);
-        // Biển (Xanh dương nền) -> Đảo (Xanh lá)
         mapCtx.fillStyle = '#6B8E23';
         mapCtx.fillRect((ISL_MIN/MAP_SIZE)*150, (ISL_MIN/MAP_SIZE)*150, ((ISL_MAX-ISL_MIN)/MAP_SIZE)*150, ((ISL_MAX-ISL_MIN)/MAP_SIZE)*150);
-        // Nhà đỏ
         mapCtx.fillStyle = 'red'; mapCtx.fillRect((1150/MAP_SIZE)*150, (1150/MAP_SIZE)*150, (100/MAP_SIZE)*150, (100/MAP_SIZE)*150);
         
-        // Quái vật (Nâu)
         mapCtx.fillStyle = '#8B4513';
         monsters.forEach(m => { mapCtx.fillRect((m.x/MAP_SIZE)*150, (m.y/MAP_SIZE)*150, 4, 4); });
         
-        // Người chơi (Vàng)
         mapCtx.fillStyle = 'yellow';
         mapCtx.beginPath(); mapCtx.arc((myPos.x/MAP_SIZE)*150, (myPos.y/MAP_SIZE)*150, 3, 0, Math.PI*2); mapCtx.fill();
     }
 
-    // --- MAIN LOOP CỦA CLIENT ---
     function loop() {
-        if(!myData || myData.isDead) { requestAnimationFrame(loop); return; } // Nếu chết thì dừng cập nhật hình ảnh 
+        if(!myData || myData.isDead) { requestAnimationFrame(loop); return; } 
 
         let isMov = false;
-        let speed = isSprinting ? 5 : 2.5; // Đã giảm tốc độ chạy
+        let speed = isSprinting ? 5 : 2.5; 
         
         if (joyActive) {
             myPos.x += Math.cos(joyAngle) * joyMag * speed;
@@ -559,7 +539,6 @@
             if(keys['d']) { myPos.x += speed; isMov = true; }
         }
 
-        // Giới hạn kẹt map
         myPos.x = Math.max(10, Math.min(MAP_SIZE-10, myPos.x));
         myPos.y = Math.max(10, Math.min(MAP_SIZE-10, myPos.y));
 
@@ -570,12 +549,10 @@
 
         socket.emit('updateState', { x: myPos.x, y: myPos.y, z: myPos.z, isMoving: isMov, isSprinting: isSprinting, weapon: currentWeapon });
 
-        // Cập nhật text Cooldown cho PC
         let now = Date.now();
         document.getElementById('cd-z-txt').innerText = `Z: ${cds['Z']>now ? ((cds['Z']-now)/1000).toFixed(1)+'s' : 'Sẵn sàng'}`;
         document.getElementById('cd-x-txt').innerText = `X: ${cds['X']>now ? ((cds['X']-now)/1000).toFixed(1)+'s' : 'Sẵn sàng'}`;
 
-        // RENDER
         ctx.clearRect(0,0,canvas.width,canvas.height);
         let camX = myPos.x - canvas.width/2;
         let camY = myPos.y - canvas.height/2;
@@ -584,20 +561,17 @@
         
         drawMap();
         
-        // Quái vật
         monsters.forEach(m => {
             if(m.hp <= 0) return;
             ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(m.x, m.y+15, 12, 5, 0, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#8B4513'; ctx.fillRect(m.x-10, m.y-15, 20, 30); ctx.strokeRect(m.x-10, m.y-15, 20, 30);
             
-            // Thanh máu quái
             ctx.fillStyle = 'black'; ctx.fillRect(m.x-15, m.y-25, 30, 4);
             ctx.fillStyle = 'red'; ctx.fillRect(m.x-15, m.y-25, 30*(m.hp/m.maxHp), 4);
         });
 
         drawEffects();
         
-        // Render Players
         let all = Object.values(players).sort((a,b)=>a.y - b.y);
         all.forEach(p => { if(!p.isDead) drawCharacter(p); });
 
